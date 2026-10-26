@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gel Band Quantifier</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --fg: #1b1f24; --muted: #5f6b7a; --border: #dde1e6;
+    --grid: #e7eaee; --accent: #2563eb; --ladder: #c026d3; --warn-bg: #fff7e0; --warn-fg: #7a5300;
+    --err-bg: #fde8e8; --err-fg: #9b1c1c; --row-sel: #e8f0ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111418; --panel: #1a1e24; --fg: #e6e9ed; --muted: #9aa5b1; --border: #2c323a;
+      --grid: #262c33; --accent: #60a5fa; --ladder: #e879f9; --warn-bg: #3a2f10; --warn-fg: #f5d68a;
+      --err-bg: #3d1717; --err-fg: #f8b4b4; --row-sel: #1e2a3d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111418; --panel: #1a1e24; --fg: #e6e9ed; --muted: #9aa5b1; --border: #2c323a;
+    --grid: #262c33; --accent: #60a5fa; --ladder: #e879f9; --warn-bg: #3a2f10; --warn-fg: #f5d68a;
+    --err-bg: #3d1717; --err-fg: #f8b4b4; --row-sel: #1e2a3d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  header a { color: var(--accent); }
+  .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; padding: 16px; }
+  @media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  aside, .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+  aside { padding: 12px; align-self: start; }
+  fieldset { border: 0; border-top: 1px solid var(--border); margin: 0; padding: 10px 0 6px; }
+  fieldset:first-child { border-top: 0; padding-top: 0; }
+  summary { cursor: pointer; font-size: 13px; color: var(--muted); margin: 4px 0; }
+  details.section > summary { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 0; }
+  details[open] > summary { margin-bottom: 6px; }
+  legend { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 0; }
+  label.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 6px 0; font-size: 13px; }
+  label.row input, label.row select, label.row textarea { grid-column: 1 / -1; }
+  label.check { display: flex; gap: 6px; align-items: center; margin: 6px 0; font-size: 13px; }
+  input[type=number], select, textarea { width: 100%; padding: 5px 6px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--fg); font: inherit; }
+  textarea { font: 12px/1.35 ui-monospace, Menlo, monospace; resize: vertical; }
+  button { font: inherit; padding: 6px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .hint { color: var(--muted); font-size: 12px; margin: 4px 0; }
+  .drop { display: block; margin-top: 6px; border: 2px dashed var(--border); border-radius: 8px; padding: 14px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--accent); color: var(--accent); }
+  .drop input { display: none; }
+  main { display: grid; gap: 16px; min-width: 0; align-content: start; }
+  .card { padding: 12px; min-width: 0; }
+  .card h2 { font-size: 14px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; white-space: nowrap; }
+  .seg button + button { border-left: 0; }
+  .seg button:first-child { border-radius: 5px 0 0 5px; }
+  .seg button:last-child { border-radius: 0 5px 5px 0; }
+  .seg button[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #modeHint { color: var(--muted); font-size: 13px; margin: 0 0 8px; min-height: 1.4em; }
+  #gelWrap { background: #000; border-radius: 6px; overflow: hidden; position: relative; }
+  #gelScroll { position: relative; overflow: auto; max-height: 75vh; }
+  #gel { display: block; margin: 0 auto; cursor: crosshair; touch-action: none; }
+  #gel.pan { cursor: grab; }
+  .rotRow { display: flex; gap: 6px; align-items: center; margin: 8px 0 4px; font-size: 13px; }
+  .rotRow span { flex: 1; }
+  .rotRow input { width: 64px; }
+  #empty { color: #9aa5b1; padding: 60px 16px; text-align: center; }
+  #busy { position: absolute; inset: 0; display: none; place-items: center; background: rgba(0,0,0,.45); color: #fff; font-weight: 600; }
+  #busy.on { display: grid; }
+  #ladderPop { position: absolute; z-index: 2; width: 250px; background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.35); padding: 8px; font-size: 13px; }
+  #ladderPop .popHead { font-weight: 600; margin-bottom: 6px; }
+  #ladderPop .popHead small { color: var(--muted); font-weight: 400; }
+  #ladderPop .popSizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 220px; overflow-y: auto; }
+  #ladderPop .popFoot { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; margin-top: 6px; }
+  #ladderPop button { padding: 4px 2px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  #ladderPop button.used { color: var(--muted); }
+  #ladderPop button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  body.plate .lanesOnly, body:not(.plate) .plateOnly, body:not(.multi) .multiOnly { display: none !important; }
+  .msgs { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+  .msgs li { padding: 6px 8px; border-radius: 5px; margin-top: 4px; background: var(--bg); }
+  .msgs li.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .msgs li.err { background: var(--err-bg); color: var(--err-fg); }
+  .msgs li.warnGroup { padding: 0; background: none; }
+  .msgs li.warnGroup summary { padding: 6px 8px; border-radius: 5px; background: var(--warn-bg); color: var(--warn-fg); cursor: pointer; font-weight: 600; }
+  .msgs li.warnGroup .msgs { margin: 0 0 0 12px; }
+  .plots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .plots canvas { width: 100%; height: 230px; display: block; }
+  .tableWrap { overflow: auto; max-height: 460px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; }
+  td.l, th.l { text-align: left; }
+  tr.ladder td { color: var(--ladder); }
+  tr.sel td { background: var(--row-sel); }
+  tbody tr { cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Gel Band Quantifier</h1>
+  <span>Band detection by <a href="https://github.com/mattaq31/GelGenie" target="_blank" rel="noopener">GelGenie</a> models; size and DNA amount from a ladder.</span>
+</header>
+<div class="layout">
+  <aside>
+    <fieldset>
+      <legend>Gel</legend>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept=".bmp,.jpg,.jpeg,.png,.tif,.tiff,image/*">
+        <div id="dropText">Drop a gel image here or click to choose<br><small>BMP, JPEG, PNG or TIFF</small></div>
+      </label>
+      <div class="rotRow">
+        <span>Rotate</span>
+        <button id="rotL" title="Rotate 90° anticlockwise" disabled>↺ 90°</button>
+        <button id="rotR" title="Rotate 90° clockwise" disabled>↻ 90°</button>
+        <input type="number" id="rotAngle" step="0.5" value="0" title="Rotation in degrees, clockwise (fine values straighten a tilted gel)" disabled>°
+      </div>
+      <label class="row">Gel type
+        <select id="layout">
+          <option value="lanes">Standard gel (one row of lanes)</option>
+          <option value="multi">Multi-row gel (several rows of wells)</option>
+          <option value="plate">96-well plate (E-Gel 96)</option>
+        </select>
+      </label>
+      <div class="plateOnly">
+        <label class="row">Rows<input type="number" id="plateRows" min="2" max="16" value="8"></label>
+        <label class="row">Columns<input type="number" id="plateCols" min="2" max="24" value="12"></label>
+        <label class="check"><input type="checkbox" id="plateMarker" checked> Marker column after the last column (M)</label>
+        <label class="check"><input type="checkbox" id="plateStagger" checked> Staggered rows (B, D, F, H offset by half a well)</label>
+        <div class="btns"><button id="gridBtn">Set well grid</button></div>
+        <p class="hint">Click the centres of wells A1, A12 and H1. Each band is assigned to the well it ran from, and sized by its migration distance.</p>
+      </div>
+      <p class="hint multiOnly">Rows are split at empty gaps between bands; fix them in Rows mode. Each row gets its own lanes and its own ladder (by default the lane with the most bands).</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ladder</legend>
+      <label class="row">Ladder<select id="ladderPreset"></select></label>
+      <label class="row">Amount loaded (µg)<input type="number" id="ladderUg" min="0" step="0.05" value="0.5"></label>
+      <label class="row">Ladder lane or well<select id="ladderLane"></select></label>
+      <p class="hint multiOnly">Multi-row gels: this sets the ladder of the selected row.</p>
+      <details>
+        <summary>Edit ladder bands</summary>
+        <label class="row">Bands: size (bp), mass (ng)<textarea id="ladderText" rows="7" spellcheck="false"></textarea></label>
+        <p class="hint">One band per line, largest first. Edit to use any ladder.</p>
+      </details>
+    </fieldset>
+
+    <fieldset>
+      <legend>Samples</legend>
+      <label class="row">Volume loaded per lane (µL)<input type="number" id="sampleUl" min="0" step="0.5" value="5"></label>
+    </fieldset>
+
+    <fieldset>
+      <details class="section">
+        <summary>Detection</summary>
+        <label class="row">Band color
+          <select id="invert">
+            <option value="auto">Auto-detect</option>
+            <option value="no">Bright bands on dark background</option>
+            <option value="yes">Dark bands on light background</option>
+          </select>
+        </label>
+        <label class="row">Model<select id="model"></select></label>
+        <label class="row">Upscale before detection
+          <select id="upscale">
+            <option value="0">Auto (small images)</option>
+            <option value="1">None</option>
+            <option value="2">2×</option>
+            <option value="3">3×</option>
+            <option value="4">4×</option>
+          </select>
+        </label>
+        <label class="row">Minimum band area (px)<input type="number" id="minArea" min="1" value="10"></label>
+        <label class="row">Ignore bands fainter than (% of brightest)<input type="number" id="faint" min="0" max="95" value="0"></label>
+        <label class="check"><input type="checkbox" id="rescue"> Also add bright spots the model missed</label>
+        <div class="btns"><button class="primary" id="runBtn" disabled>Detect bands</button></div>
+        <p class="hint">Each model is downloaded from HuggingFace (~57 MB) the first time it is used.</p>
+      </details>
+    </fieldset>
+
+    <fieldset>
+      <details class="section">
+        <summary>Quantification</summary>
+        <label class="row">Band volume
+          <select id="volKey">
+            <option value="global_volume">Global background corrected</option>
+            <option value="rb_volume">Rolling-ball corrected</option>
+            <option value="local_volume">Local background corrected</option>
+            <option value="raw_volume">Raw (no correction)</option>
+          </select>
+        </label>
+        <label class="row">Local background border (px)<input type="number" id="border" min="1" max="100" value="5"></label>
+        <label class="row">Rolling-ball radius (px)<input type="number" id="rbRadius" min="5" max="500" value="50"></label>
+      </details>
+    </fieldset>
+  </aside>
+
+  <main>
+    <section class="card">
+      <h2>
+        <span class="seg" role="group" aria-label="Edit mode">
+          <button data-mode="view" aria-pressed="true">View</button>
+          <button data-mode="lanes" class="lanesOnly">Lanes</button>
+          <button data-mode="grid" class="plateOnly">Grid</button>
+          <button data-mode="rows" class="multiOnly">Rows</button>
+          <button data-mode="bands">Bands</button>
+          <button data-mode="ladder">Ladder</button>
+        </span>
+        <span class="btns" style="margin:0">
+          <span class="seg" role="group" aria-label="Zoom">
+            <button id="zoomOut" title="Zoom out (−)">−</button>
+            <button id="zoomFit" title="Fit to panel (0)">Fit</button>
+            <button id="zoomIn" title="Zoom in (+). Also ⌘/Ctrl + scroll or pinch">+</button>
+          </span>
+          <button id="overlayBtn" aria-pressed="true" title="Show or hide detected bands, lanes and wells (H)">Hide detected</button>
+          <button id="resetEdits" disabled>Reset edits</button>
+        </span>
+      </h2>
+      <p id="modeHint"></p>
+      <div id="gelWrap">
+        <div id="empty">No image loaded</div>
+        <div id="gelScroll"><canvas id="gel" hidden></canvas></div>
+        <div id="busy">Working…</div>
+        <div id="ladderPop" hidden></div>
+      </div>
+      <ul class="msgs" id="msgs"></ul>
+    </section>
+
+    <section class="plots">
+      <div class="card"><h2 id="sizeTitle">Size calibration</h2><canvas id="plotSize"></canvas></div>
+      <div class="card"><h2 id="massTitle">Mass calibration</h2><canvas id="plotMass"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2><span>Bands</span><button class="primary" id="csv" disabled>Download CSV</button></h2>
+      <div class="tableWrap">
+        <table>
+          <thead><tr>
+            <th id="laneHead">Lane</th><th>Band</th><th>Size (bp)</th><th>Mass (ng)</th><th>Conc (ng/µL)</th>
+            <th>Volume</th><th>Area (px)</th><th id="posHead">Rf</th><th class="l">Flags</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="calibration.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
