@@ -6,7 +6,7 @@ ladder, and exports a CSV.
 
 - `server/` – FastAPI + ONNX Runtime. Runs the GelGenie models and measures bands.
 - `web/` – static client (served by the server). Lane, band and ladder editing, calibration, CSV.
-- `samples/` – test images (`neb_1kb_plus_ladder_gel.tif` is from the GelGenie repo, NEB 1 kb Plus, 1 µg per lane).
+- `samples/` – test images.
 
 ## Run
 
@@ -15,7 +15,7 @@ cd server
 uv run uvicorn app:app --port 8000
 ```
 
-Open http://127.0.0.1:8000. Models are downloaded from HuggingFace into `server/models/` on first
+Open http://127.0.0.1:8000. Models are downloaded into `server/models/` on first
 use (~57 MB each).
 
 ## Docker
@@ -29,18 +29,11 @@ The image bakes in the Universal and Sharp-band models; others download on first
 `/app/models` (mount a volume there to keep them). It runs a single worker on purpose, since
 uploaded images are held in memory.
 
-Deployed with the other lab apps via [tgs-lab-apps](../tgs-lab-apps) as service `gelsym` on port
-3812: `docker compose up -d gelsym` there (builds from `../gelsym`), or
-`./build_and_push.sh aangeloo latest gelsym` to push the image to Docker Hub.
+Deployed with the other lab apps via [tgs-lab-apps]
 
 ## How it works
 
-1. **Segmentation** – same preprocessing as the GelGenie QuPath extension: grayscale (channel mean)
-   scaled to 0–1, inverted for dark-band images, zero-padded to a multiple of 32, argmax over the
-   model's classes. Images under ~800 px are upscaled 2–4× first (the models miss small bands
-   otherwise). Connected band pixels (8-connectivity) are one band. The 3-class model also finds
-   wells, which add lanes that have no bands. Optionally, very bright spots the model missed
-   (it can skip saturated, compact bands) are added by thresholding ("bright spot" flag).
+1. **Segmentation** – same preprocessing as the GelGenie QuPath extension:
 2. **Measurement** (per band, on 0–255 intensities with bands bright):
    - raw volume: sum of pixels in the band
    - global: raw − median of all non-band pixels in the image × band area
@@ -51,8 +44,6 @@ Deployed with the other lab apps via [tgs-lab-apps](../tgs-lab-apps) as service 
 4. **Calibration** – ladder bands are matched to the ladder sizes top-down, or around the sizes you
    set in Ladder mode. Size: log10(bp) interpolated against band position. Mass: band volume = k × ng (least squares through the origin).
 
-On the sample gel, global-background volumes correlate with the manufacturer's band masses at
-r ≈ 0.98 once merged bands are fixed.
 
 ## Editing
 
@@ -77,35 +68,21 @@ Edits are kept in image coordinates and re-applied whenever detection re-runs.
 ## Multi-row gels
 
 Set **Gel type** to *Multi-row gel* for gels cast with several combs (rows of wells, one above the
-other). Rows are split halfway across empty vertical gaps between bands (wider than 5% of the image
-height; a lone speck doesn't make a row). In **Rows** mode, click between rows to add a boundary
+other). In **Rows** mode, click between rows to add a boundary
 or click a boundary to remove it. Lanes are then found separately in each row, so rows that are
 shifted sideways are fine.
 
 Each row is calibrated against its own ladder lane, measured from the top of the row; by default
 it's the lane with the most bands (a ladder has more bands than a sample). Pick another in the
 ladder list (it applies to the selected row) or by clicking a band in Ladder mode. Lanes are
-labelled R2-5 (row 2, lane 5); the CSV has row and column columns. Lanes only exist where bands
-were found, so empty wells get no lane unless you add one in Lanes mode.
+labelled R2-5 (row 2, lane 5); the CSV has row and column columns. 
 
 ## 96-well plates (E-Gel 96)
 
-Set **Gel type** to *96-well plate*. This switches to settings that work on plates: the sharp-band
-model upscaled 2×, bright-spot rescue on, and bands fainter than 30% of the brightest ignored
-(this hides the glow below every well). Then click **Grid** and the centres of wells A1, A12 and
+Set **Gel type** to *96-well plate*. Click **Grid** and then the centres of wells A1, A12 and
 H1. Rows, columns, a marker column (M) and the half-well stagger of rows B, D, F, H are set in the
 sidebar.
 
-Each band is assigned to the well it ran from: the nearest well above it at the same column
-position, with a run of 0.15–2 row pitches (objects level with a well are rims or stuck DNA).
-Size is calibrated against the ladder well's bands by migration distance below the well; the
-default ladder well is the marker well with the most bands. The table and CSV give the well, plate
-row and column, and the migration distance.
-
-On the sample plates: on a 2% plate, 95 of 96 wells got their band (the 96th is empty). On a 1%
-single-genome-amplification plate, the product bands visible by eye were all assigned to the
-right wells, though the brightest ones are only found with bright-spot rescue; some bands split
-into two pieces and need merging with a box in Bands mode.
 
 ## API
 
