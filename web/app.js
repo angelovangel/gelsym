@@ -109,6 +109,17 @@
   }
   $('overlayBtn').onclick = toggleOverlay;
 
+  // ---- Collapsible settings panel (remembered per browser) ----
+  function setSidebar(open) {
+    document.body.classList.toggle('noside', !open);
+    $('sideBtn').setAttribute('aria-expanded', open);
+    $('sideBtn').title = open ? 'Hide the settings panel' : 'Show the settings panel';
+    try { localStorage.setItem('gelsym.sidebar', open ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+    if (S.image) { draw(); renderPlots(); }
+  }
+  $('sideBtn').onclick = () => setSidebar(document.body.classList.contains('noside'));
+  try { if (localStorage.getItem('gelsym.sidebar') === '0') setSidebar(false); } catch (e) { /* storage unavailable */ }
+
   // ---- Rotation (server side, so detection runs on the rotated image) ----
   async function setRotation(angle) {
     if (!S.image) return;
@@ -298,7 +309,8 @@
     S.drag = { start: p, end: p, moved: false, px: [ev.clientX, ev.clientY], scroll: [sc.scrollLeft, sc.scrollTop] };
   });
   gel.addEventListener('pointermove', ev => {
-    if (!S.drag) return;
+    if (!S.drag) { showTip(ev); return; }
+    hideTip();
     if (Math.hypot(ev.clientX - S.drag.px[0], ev.clientY - S.drag.px[1]) > 5) S.drag.moved = true;
     if (S.mode === 'view') {  // drag to pan
       const sc = $('gelScroll');
@@ -319,6 +331,36 @@
     } else onClick(d.start, ev);
   });
   gel.addEventListener('pointercancel', () => { S.drag = null; draw(); });
+  gel.addEventListener('pointerleave', hideTip);
+
+  // ---- Band tooltip: size and mass on hover ----
+  function hideTip() { $('tip').hidden = true; }
+  function showTip(ev) {
+    const b = S.image && S.overlay && $('ladderPop').hidden ? hitBand(toImage(ev)) : null;
+    if (!b) return hideTip();
+    const g = S.groups[b.lane], isLadder = isLadderGroup(b.lane);
+    const where = b.removed ? 'Removed band'
+      : g ? `${S.plate ? 'Well' : 'Lane'} ${g.label}, band ${S.laneBands[b.lane].indexOf(b) + 1}${isLadder ? ' (ladder)' : ''}`
+      : `Not in a ${S.plate ? 'well' : 'lane'}`;
+    const ul = parseFloat($('sampleUl').value);
+    const bp = v => v == null ? '–' : `${Math.round(v).toLocaleString()} bp`;
+    const ng = v => v == null ? '–' : `${v.toFixed(v < 10 ? 2 : 1)} ng`;
+    const rows = [`<b>${esc(where)}</b>`];
+    if (!b.removed && g) {
+      rows.push(`Size: <b>${bp(b.bp)}</b>${isLadder && b.ladderBp ? ` <span class="muted">(ladder ${bp(b.ladderBp)})</span>` : ''}`);
+      rows.push(`Mass: <b>${ng(b.ng)}</b>${isLadder && b.ladderNg != null ? ` <span class="muted">(ladder ${ng(b.ladderNg)})</span>` : ''}`);
+      if (!isLadder && b.ng != null && ul > 0) rows.push(`Conc: <b>${(b.ng / ul).toFixed(2)} ng/µL</b> <span class="muted">(${ul} µL loaded)</span>`);
+      if (b.flags && b.flags.length) rows.push(`<span class="muted">${esc(b.flags.join(', '))}</span>`);
+    }
+    const tip = $('tip'), wrap = $('gelWrap').getBoundingClientRect();
+    tip.innerHTML = rows.join('<br>');
+    tip.hidden = false;
+    let x = ev.clientX - wrap.left + 14, y = ev.clientY - wrap.top + 14;
+    if (x + tip.offsetWidth > wrap.width - 4) x = ev.clientX - wrap.left - tip.offsetWidth - 14;
+    if (y + tip.offsetHeight > wrap.height - 4) y = ev.clientY - wrap.top - tip.offsetHeight - 14;
+    tip.style.left = Math.max(4, x) + 'px';
+    tip.style.top = Math.max(4, y) + 'px';
+  }
 
   function laneAt([x, y]) {
     const t = tierAt(y);
@@ -400,6 +442,7 @@
 
   // ---- Ladder size picker ----
   function openPop(band, p, ev) {
+    hideTip();
     const pop = $('ladderPop'), wrap = $('gelWrap').getBoundingClientRect();
     const sizes = parseLadder().map(([bp]) => bp).sort((a, b) => b - a);
     const used = new Map(S.laneBands[band.lane].filter(b => b !== band && typeof b.ladderFix === 'number').map(b => [b.ladderFix, true]));

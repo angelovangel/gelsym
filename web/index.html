@@ -25,12 +25,14 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
-  header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   header h1 { font-size: 17px; margin: 0; }
   header span { color: var(--muted); font-size: 13px; }
   header a { color: var(--accent); }
   .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; padding: 16px; }
   @media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  body.noside aside { display: none; }
+  body.noside .layout { grid-template-columns: minmax(0, 1fr); }
   aside, .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
   aside { padding: 12px; align-self: start; }
   fieldset { border: 0; border-top: 1px solid var(--border); margin: 0; padding: 10px 0 6px; }
@@ -66,9 +68,11 @@
   #gelScroll { position: relative; overflow: auto; max-height: 75vh; }
   #gel { display: block; margin: 0 auto; cursor: crosshair; touch-action: none; }
   #gel.pan { cursor: grab; }
-  .rotRow { display: flex; gap: 6px; align-items: center; margin: 8px 0 4px; font-size: 13px; }
-  .rotRow span { flex: 1; }
-  .rotRow input { width: 64px; }
+  .angle { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--muted); }
+  .angle input { width: 58px; padding: 5px 4px; }
+  #tip { position: absolute; z-index: 3; pointer-events: none; background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.35); padding: 6px 8px; font-size: 12px; line-height: 1.45; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #tip b { font-weight: 600; }
+  #tip .muted { color: var(--muted); }
   #empty { color: #9aa5b1; padding: 60px 16px; text-align: center; }
   #busy { position: absolute; inset: 0; display: none; place-items: center; background: rgba(0,0,0,.45); color: #fff; font-weight: 600; }
   #busy.on { display: grid; }
@@ -102,6 +106,7 @@
 </head>
 <body>
 <header>
+  <button id="sideBtn" aria-expanded="true" title="Hide the settings panel">☰ Settings</button>
   <h1>Gel Band Quantifier</h1>
   <span>Band detection by <a href="https://github.com/mattaq31/GelGenie" target="_blank" rel="noopener">GelGenie</a> models; size and DNA amount from a ladder.</span>
 </header>
@@ -113,12 +118,6 @@
         <input type="file" id="file" accept=".bmp,.jpg,.jpeg,.png,.tif,.tiff,image/*">
         <div id="dropText">Drop a gel image here or click to choose<br><small>BMP, JPEG, PNG or TIFF</small></div>
       </label>
-      <div class="rotRow">
-        <span>Rotate</span>
-        <button id="rotL" title="Rotate 90° anticlockwise" disabled>↺ 90°</button>
-        <button id="rotR" title="Rotate 90° clockwise" disabled>↻ 90°</button>
-        <input type="number" id="rotAngle" step="0.5" value="0" title="Rotation in degrees, clockwise (fine values straighten a tilted gel)" disabled>°
-      </div>
       <label class="row">Gel type
         <select id="layout">
           <option value="lanes">Standard gel (one row of lanes)</option>
@@ -212,6 +211,11 @@
           <button data-mode="ladder">Ladder</button>
         </span>
         <span class="btns" style="margin:0">
+          <span class="seg" role="group" aria-label="Rotate">
+            <button id="rotL" title="Rotate 90° anticlockwise" disabled>↺</button>
+            <button id="rotR" title="Rotate 90° clockwise" disabled>↻</button>
+          </span>
+          <label class="angle" title="Rotation in degrees, clockwise (fine values straighten a tilted gel)"><input type="number" id="rotAngle" step="0.5" value="0" disabled>°</label>
           <span class="seg" role="group" aria-label="Zoom">
             <button id="zoomOut" title="Zoom out (−)">−</button>
             <button id="zoomFit" title="Fit to panel (0)">Fit</button>
@@ -227,6 +231,7 @@
         <div id="gelScroll"><canvas id="gel" hidden></canvas></div>
         <div id="busy">Working…</div>
         <div id="ladderPop" hidden></div>
+        <div id="tip" hidden></div>
       </div>
       <ul class="msgs" id="msgs"></ul>
     </section>
